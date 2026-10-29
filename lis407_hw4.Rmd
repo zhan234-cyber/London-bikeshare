@@ -1,0 +1,196 @@
+---
+title: "London's Bike-Sharing Rhythms: How Work and Weather Affect the City's Flow"
+author: "Zeyang Han"
+date: "2026-05-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(scales)
+```
+
+
+## Introduction: The City Never Stops Pedaling
+
+London is one of the most vibrant city in the world. It has a massive crowds of cycling. There are over ten thousand of riders traversing the city every day. This dataset, sourced from Transport for London, captures 17342 observations between 2015 and 2016 about the usage of the shared bike with 14 different variables, including real temperature, weather, hour of the day, count of a new bike shares during that hour etc. We want to explore the variation of the flow of using the shared bike in the city of London under different weather conditions across the four seasons.
+
+## Motivation of the Exploration
+
+In the process of exploring this dataset, we can answer several interesting questions. Does weather stop a commuter the same way it stops a weekend tourist? When is the peak of the usage of shared bike during weekday versus weekend, why is the peak happen at that specific time? Will the flow fluctuate in different seasons? By answering these questions, we can observe the changes in the pace of life of Londoners on weekdays and weekends, and could also probably predict the pace of life in other cities similar to London in the world, so that the city planners or the shared bike companies can better prepare for the peak loads.
+
+
+```{r data, include=FALSE}
+bikeshare_data = read_csv("bikeshare.csv")
+# add variables that represents hour of the day and day type
+bikeshare_data = bikeshare_data %>% 
+  mutate(
+    timestamp = as.POSIXct(timestamp, format="%Y-%m-%dT%H:%M:%SZ"),
+    hour = hour(timestamp),
+    day_type = ifelse(is_weekend == "TRUE", "Weekend", "Weekday"),
+    day_type = factor(day_type, levels = c("Weekday", "Weekend")),
+    season = factor(season, levels = c("spring", "summer", "fall", "winter"))
+  )
+dim(bikeshare_data)
+```
+
+
+```{r exploration1, include=FALSE}
+# Step 2: Explore the data
+
+# Exploring cnt (The number of new bikes shares during that hour)
+bikeshare_data %>% 
+  summarize(
+    mean_shares = mean(cnt),
+    median_shares = median(cnt),
+    sd_shares = sd(cnt),
+    min_shares = min(cnt),
+    max_shares = max(cnt),
+    total_records = n()
+  )
+
+# Exploring t1 (Real temperature in F)
+bikeshare_data %>% 
+  summarize(
+    avg_temp = mean(t1),
+    median_temp = median(t1),
+    temp_range = max(t1) - min(t1),
+  )
+
+# Exploring weather
+bikeshare_data %>% 
+  group_by(weather) %>% 
+  summarize(count = n()) %>% 
+  mutate(percentage = count / sum(count) * 100)
+```
+
+```{r exploration2, include=FALSE}
+# Step 3. Learn about the relationships between variables
+
+# 1: Relationship between real temperature and cnt
+ggplot(bikeshare_data, aes(x = t1, y = cnt)) +
+  geom_col() +
+  scale_x_continuous(breaks = seq(40, 80, by = 10))
+
+# 2: cnt by season
+ggplot(bikeshare_data, aes(x = season, y = cnt)) +
+  geom_boxplot()
+
+# 3: cnt by day type
+ggplot(bikeshare_data, aes(x = day_type, y = cnt)) +
+  geom_boxplot()
+
+# 4: Average cnt by in different hour of the day
+hourly_pattern = bikeshare_data %>% 
+  group_by(hour) %>% 
+  summarize(avg_count = mean(cnt))
+
+ggplot(hourly_pattern, aes(x = hour, y = avg_count)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(breaks = seq(0, 23, by = 1))
+
+```
+
+
+## The Daily Cycling Rhythm: Weekday vs. Weekend
+
+To begin our journey into London's rhythm, we first look at how day-to-day schedules shifts when the weekend arrives. By comparing the average hourly bike shares, we can see an apparent divergence between workdays and rest days.
+
+```{r weekday-weekend-plot, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="**Figure 1: The Daily Rhythm.** The sharp spike in shared bike usage during weekdays is at 8 AM and 5 PM compared to the smooth and steady trend of usage on weekends."}
+# Average count of new sharing bikes in each hour of the day (weekday vs. weekend)
+day_hour_patterns = bikeshare_data %>% 
+  group_by(day_type, hour) %>% 
+  summarize(avg_cnt = mean(cnt))
+
+ggplot(day_hour_patterns, aes(x = hour, y = avg_cnt, colour = day_type)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  theme_minimal(base_size = 14) +
+  scale_color_manual(values = c("Weekday" = "#2c7fb8", "Weekend" = "#feb24c")) +
+  scale_x_continuous(breaks = seq(0, 23, by = 2)) +
+  theme(plot.title = element_text(face = "bold", size = 18)) +
+  labs(
+    title = "How Weekends Change London’s Cycling Rhythm",
+    subtitle = "Average hourly bike shares in London (2015 - 2016)",
+    x = "Hour of Day (24h format)",
+    y = "Average Number of Bike Shares",
+    color = "Day Type",
+    caption = "Source: Transport for London"
+    )
+```
+
+As Figure 1 illustrates, London's weekday can be defined as "two-peak" rhythm. There are sharp spikes shown at 8:00 AM and 17:00 PM on the blue line(Weekday), conveying that the demand for shared bike is at its highest at the two peak time point, perfectly demonstrating the classic "nine-to-five" workday pattern. In contrast, the trend on weekends(Orange) follows a smooth bell-shaped curve that arises steadily from 6:00 AM, peaking at 15:00 PM, steadily descending in the rest of the day. The two contrasting rhythms tell us that weekday cyclists are very likely commuters who treat shared bikes as a way of transportation, while weekend cyclist are in leisure, waiting for the warmth of the midday sun before they ride out.
+
+
+## The Environmental Pressure on Cyclists
+
+However, timing is only part of the story. London is famous for its distinct seasons and unpredictable weathers. I faceted the data vertically by four different seasons; horizontally by "Weekday" and "Weekend"; categorized it into four common weather conditions - clear skies, cloudy skies, rainy and snowy, represented by orange, gray, dark blue, and light blue colors respectively. By comparing the variation in average number of shared bike(Y Axis) among these categories and facets, we can see if the city's demand for shared bike holds up under the pressure of bad weather conditions.
+
+```{r environmental effect, echo = FALSE, message=FALSE, warning=FALSE, out.width="100%", fig.width=10, fig.height=12, fig.cap="**Figure 2: The Environmental Pulse.** London’s commuter peaks at 8 AM and 5 PM remain consistent in timing across all seasons during weekdays, but their intensity is significantly dampened by rainy and snowy weather. Weekend leisure riding almost entirely vanishes if the weather is bad. This suggests that for Londoners, shared bikes serve as a necessary way of tranportation during weekdays while serving as a way of relaxation on weekends."}
+# Regroup weather to 4 groups to improve the clarity of the plot
+weather_bike = bikeshare_data %>% 
+  mutate(
+    weather_type = case_when(
+      weather == "clear" ~ "Clear",
+      weather %in% c("broken clouds", "cloudy", "scattered clouds") ~ "Cloudy",
+      weather %in% c("rain", "thunderstorm", "light rain") ~ "Rain",
+      weather == "snow" ~ "Snow",
+      TRUE ~ "Other" 
+    )
+  )
+
+
+# Combining season, day type, hour of the day, and weather
+summary = weather_bike %>% 
+  group_by(season, day_type, hour, weather_type) %>% 
+  summarize(avg_count = mean(cnt)) %>% 
+  # Filtering 'Other' to reduce visual noise in the final plot
+  filter(weather_type != "Other")
+
+ggplot(summary, aes(x = hour, y = avg_count, colour = weather_type)) +
+  geom_line(alpha = 0.8, size = 1) +
+  facet_grid(season ~ day_type) +
+  scale_color_manual(values = c(
+    "Clear"  = "orange",
+    "Cloudy" = "#999999",  # Neutral Gray
+    "Rain"   = "#0072B2",  # Strong Blue
+    "Snow"   = "#56B4E9"   # Ice Blue
+  )) +
+  scale_x_continuous(breaks = c(0, 8, 12, 17, 23)) +
+  theme_minimal(base_size = 16) +
+  labs(
+    title = "How Work, Weather, and Season Affect London’s Cycling Rhythm",
+    subtitle = "Average hourly bike shares in London (2015-2016)",
+    x = "Hour of Day (24h format)",
+    y = "Average Number of Bike Shares",
+    color = "Weather Condition",
+    caption = "Source: Transport for London"
+  ) +
+  theme(
+    strip.background = element_rect(fill = "gray95", color = "gray80"),
+    strip.text = element_text(face = "bold"),
+    panel.spacing.y = unit(1, "lines"),
+    legend.position = "bottom",
+    legend.margin = margin(t = 25),
+    legend.text = element_text(size = 14),
+    legend.key.width = unit(1.5, "cm"),
+    plot.title = element_text(face = "bold", size = 18),
+    panel.grid.minor = element_blank()
+  )
+```
+
+The results shown in Figure 2 reveal the resilience of cyclists in London during workdays. We can see that, the "two peak" pattern in "Weekday" facet persists across four seasons. The gray line representing cloudy weather remains similar as the orange line representing sunny weather, while the dark blue line representing rainy weather falls behind than these two. The gray line's height exceeds the orange line's height in winter. This may sounds weird but maybe it is just because there are more cloudy days than sunny days in winter. It seems that for the London commuter, the shared bike is a tool that must be used regardless of the weathers across the four seasons. 
+
+However, the weekend riders tell a different story. The height of dark blue curve in the "Weekend" facet is significantly lower than the height of dark blue line in "Weekday" facet. The light blue curve representing snowy weather is almost flat. This confirms our earlier suspicion: while the demand for shared bikes during workdays is necessary, it is highly sensitive to environmental comfort on weekends. In other words, under bad weather conditions, Londoners are willing to brave the rain to get to the office by bike, but they aren't willing to do on weekends.
+
+
+## Conclusion: Understanding the Urban Pace
+
+Through this exploration, it becomes clear that bike-sharing in London is a vital organ of the city's infrastructure. Not only does it serve as one of the major ways of transportation, but it also serves as a mean for Londoners or tourists to relax. Aside from that, the flow of the usage of shared bike shows us that there is a highly disciplined workday pace that remains unshaken by rain or coldness in London, contrasted with a leisure-focused weekend pace that is deeply influenced by the weather conditions. 
+
+Understanding these patterns allows us to see the potential schedules of a global metropolis. By analyzing these trends, city planners can better prepare for peak loads, making life more convenient for thousands of residents and tourists.
+
+
