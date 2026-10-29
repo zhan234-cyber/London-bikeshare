@@ -1,15 +1,15 @@
-# London-bikeshare
+# London-bikeshare文件介绍
 
-1. 📄 bikeshare_documentation(1)_2.txt（数据集说明文档）
+1. 📄 bikeshare_documentation(1).txt（数据集说明文档）
     内容概述：这是伦敦共享单车数据集的背景和字段定义说明。
     数据来源：数据来源于 Kaggle（原始数据由伦敦交通局 Transport for London 收集并提供），并结合了 freemeteo.com 的天气数据以及英国节假日数据。
     数据时间范围：涵盖 2015 年 1 月 1 日至 2016 年 12 月 31 日。
 
-2. 📊 bikeshare_2.csv（共享单车数据集）
+2. 📊 bikeshare.csv（共享单车数据集）
     文件类型：CSV 格式的数据表格。
     具体内容：对应上述文档说明的原始数据文件，按小时记录了 2015~2016 年间伦敦共享单车的骑行量及配套的气象、时间特征数据。
    
-4. 🌐 lis407_hw4_2.html（数据分析报告 HTML 页面）
+3. 🌐 lis407_hw4.html（数据分析报告 HTML 页面）
 
     文件背景：这是一个由 R Markdown 生成的 HTML 网页格式报告。
 
